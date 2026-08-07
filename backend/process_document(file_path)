@@ -1,0 +1,12 @@
+# test_rag.py
+import os
+from rag_assistant import process_document  # импортируй свою функцию
+
+def test_document_chunking():
+    test_file = "test_sample.pdf"
+    # Создай маленький тестовый PDF (или txt) и положи рядом с тестами
+    chunks = process_document(test_file)
+    
+    assert isinstance(chunks, list)
+    assert len(chunks) > 0
+    assert all(isinstance(c, str) and len(c) > 10 for c in chunks)
