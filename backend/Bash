@@ -1,1 +1,6 @@
+# 1. Активируй виртуальное окружение (если ещё не активировано)
+source venv/bin/activate    # для macOS/Linux/Bash
+# или venv\Scripts\activate # для Windows
+
+# 2. Запусти сервер
 uvicorn app.main:app --reload
