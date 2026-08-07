@@ -1,0 +1,9 @@
+def test_search_returns_relevant_chunks():
+    chunks = ["В рецепте сказано: возьмите 200 г муки.", "Шаг 2: смешайте яйца и сахар.", "Шаг 3: добавьте муку и перемешайте."]
+    query = "сколько муки нужно"
+    
+    results = search_chunks(query, chunks)
+    
+    assert len(results) > 0
+    # Проверяем, что в результатах есть фраза про муку
+    assert any("мука" in chunk.lower() for chunk in results)
