@@ -9,25 +9,6 @@
 - поиск по векторной базе ChromaDB
 - генерация ответа на вопрос по найденным чанкам
 
-## Структура проекта
-```text
-project/
-├── backend/
-│   ├── app/
-│   │   ├── config.py
-│   │   ├── main.py
-│   │   └── rag_engine.py
-│   ├── .env.example
-│   └── requirements.txt
-├── src/
-│   ├── App.tsx
-│   ├── api.ts
-│   ├── Chat.tsx
-│   └── components/
-├── README.md
-└── package.json
-```
-
 ## Запуск backend
 ```bash
 cd backend
@@ -35,7 +16,7 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# затем укажи реальный GEMINI_API_KEY
+# вставь свой GEMINI_API_KEY
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -49,7 +30,7 @@ npm run dev
 - POST /api/v1/upload
 - POST /api/v1/query
 
-## Пример запроса
+## Пример JSON
 ```json
 {
   "question": "Что написано в документе?",
