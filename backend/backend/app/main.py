@@ -1,60 +1,63 @@
 import os
 import shutil
-from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, status
+from typing import List
+
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import settings
 from app.rag_engine import RAGEngine
 
-# Инициализируем приложение
 app = FastAPI(
-    title=settings.APP_NAME,
-    debug=settings.DEBUG,
-    version="1.0.0"
+    title=settings["APP_NAME"],
+    debug=settings["DEBUG"],
+    version="1.0.0",
 )
 
-# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings["CORS_ORIGINS"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Инициализируем RAG Engine
 rag = RAGEngine()
 
-# --- Схемы данных (Pydantic) ---
-class QueryRequest(BaseModel):
-    question: str
 
-class QueryResponse(BaseModel):
-    answer: str
-    sources: List[str] = []
+class QueryRequest(BaseModel):
+    question: str = ""
+    query: str = ""
+    top_k: int = 4
+
 
 class UploadResponse(BaseModel):
     filename: str
     chunks_processed: int
     status: str
+    message: str = "success"
 
 
-# --- Эндпоинты ---
+class QueryResponse(BaseModel):
+    answer: str
+    sources: List[dict] = []
+
 
 @app.get("/", tags=["Health Check"])
 async def root():
-    return {"status": "online", "app": settings.APP_NAME}
+    return {"status": "online", "app": settings["APP_NAME"]}
 
 
+@app.post("/api/v1/upload", response_model=UploadResponse, tags=["RAG"])
 @app.post("/upload", response_model=UploadResponse, tags=["RAG"])
-async def upload_pdf(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Поддерживаются только PDF файлы."
-        )
+async def upload_document(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(400, "Filename is required.")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in {".pdf", ".txt", ".md"}:
+        raise HTTPException(400, "Only PDF, TXT or MD files are supported.")
 
     temp_dir = "./temp"
     os.makedirs(temp_dir, exist_ok=True)
@@ -64,38 +67,36 @@ async def upload_pdf(file: UploadFile = File(...)):
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Вызов твоего метода из rag_engine.py
-        chunks = rag.process_pdf(temp_path, file.filename)
-
+        chunks_count = rag.process_file(temp_path, file.filename)
         return UploadResponse(
             filename=file.filename,
-            chunks_processed=chunks,
-            status="success"
+            chunks_processed=chunks_count,
+            status="success",
+            message="File processed successfully.",
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при обработке PDF: {str(e)}"
-        )
+    except Exception as exc:
+        raise HTTPException(500, f"Error processing file: {str(exc)}") from exc
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
 
+@app.post("/api/v1/query", tags=["RAG"])
 @app.post("/query", tags=["RAG"])
-async def ask_question(request: QueryRequest):
-    if not request.question.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Вопрос не может быть пустым."
-        )
+async def ask_question(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Request body must be JSON.")
+
+    question = (payload.get("question") or payload.get("query") or "").strip()
+    top_k = int(payload.get("top_k", 4))
+
+    if not question:
+        raise HTTPException(400, "Question cannot be empty.")
 
     try:
-        # Вызов твоего метода из rag_engine.py
-        result = rag.query(request.question)
+        result = rag.query(question, top_k=top_k)
         return result
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при генерации ответа: {str(e)}"
-        )
+    except Exception as exc:
+        raise HTTPException(500, f"Error generating answer: {str(exc)}") from exc

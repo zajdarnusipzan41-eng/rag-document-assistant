@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 export interface SourceDocument {
   content: string;
@@ -12,16 +12,16 @@ export interface QueryResponse {
 
 export interface UploadResponse {
   filename: string;
-  chunks_created: number;
-  message: str;
+  chunks_processed: number;
+  status: string;
+  message?: string;
 }
 
-// Загрузка файла на бэкенд (/documents/upload)
 export async function uploadDocument(file: File): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/upload`, {
     method: 'POST',
     body: formData,
   });
@@ -34,9 +34,8 @@ export async function uploadDocument(file: File): Promise<UploadResponse> {
   return response.json();
 }
 
-// Отправка вопроса в RAG-чат (/chat/query)
 export async function sendQuery(query: string, topK: number = 3): Promise<QueryResponse> {
-  const response = await fetch(`${API_BASE_URL}/chat/query`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/query`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
