@@ -1,9 +1,7 @@
-import json
 import os
 from typing import Any, Dict, List
 
 import chromadb
-from chromadb.config import Settings as ChromaSettings
 from google import genai
 from pypdf import PdfReader
 
@@ -14,9 +12,9 @@ class RAGEngine:
     def __init__(self):
         self.api_key = settings["GEMINI_API_KEY"] or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY is missing. Add it to .env or environment variables.")
+            raise ValueError("GEMINI_API_KEY is empty. Add it to backend/.env or environment variables.")
 
-        self.genai_client = genai.Client(api_key=self.api_key)
+        self.client = genai.Client(api_key=self.api_key)
 
         os.makedirs(settings["CHROMA_DB_DIR"], exist_ok=True)
         self.chroma_client = chromadb.PersistentClient(path=settings["CHROMA_DB_DIR"])
@@ -26,6 +24,9 @@ class RAGEngine:
         )
 
     def _chunk_text(self, text: str, chunk_size: int, overlap: int) -> List[str]:
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be greater than 0")
+
         chunks: List[str] = []
         start = 0
 
@@ -34,13 +35,18 @@ class RAGEngine:
             chunk = text[start:end].strip()
             if chunk:
                 chunks.append(chunk)
+
+            if overlap >= chunk_size:
+                overlap = chunk_size - 1
+
             start += chunk_size - overlap
 
         return chunks
 
     def _extract_text_from_pdf(self, file_path: str) -> str:
         reader = PdfReader(file_path)
-        pages = []
+        pages: List[str] = []
+
         for page in reader.pages:
             text = page.extract_text() or ""
             if text.strip():
@@ -54,16 +60,17 @@ class RAGEngine:
     def _extract_text_from_txt(self, file_path: str) -> str:
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
             text = f.read()
+
         if not text.strip():
             raise ValueError("TXT/MD file is empty.")
         return text
 
     def process_file(self, file_path: str, filename: str) -> int:
-        lower_name = filename.lower()
+        name = filename.lower()
 
-        if lower_name.endswith(".pdf"):
+        if name.endswith(".pdf"):
             text = self._extract_text_from_pdf(file_path)
-        elif lower_name.endswith((".txt", ".md")):
+        elif name.endswith((".txt", ".md")):
             text = self._extract_text_from_txt(file_path)
         else:
             raise ValueError("Unsupported file type. Use PDF, TXT or MD.")
@@ -78,54 +85,54 @@ class RAGEngine:
     def _add_to_vector_db(self, chunks: List[str], filename: str):
         for index, chunk in enumerate(chunks):
             try:
-                response = self.genai_client.models.embed_content(
+                embedding_result = self.client.models.embed_content(
                     model=settings["EMBEDDING_MODEL_NAME"],
                     contents=chunk,
                 )
-                embedding = response.embeddings[0].values
+                embedding = embedding_result.embeddings[0].values
+
                 self.collection.add(
                     ids=[f"{filename}_{index}"],
                     embeddings=[embedding],
                     documents=[chunk],
                     metadatas=[{"source": filename, "chunk_index": index}],
                 )
-            except Exception as e:
-                print(f"Embedding error for chunk {index}: {e}")
+            except Exception as exc:
+                print(f"Embedding error for chunk {index}: {exc}")
                 continue
 
     def query(self, question: str, top_k: int = 4) -> Dict[str, Any]:
-        if not question.strip():
+        if not question or not question.strip():
             raise ValueError("Question cannot be empty.")
 
-        response = self.genai_client.models.embed_content(
+        embedding_result = self.client.models.embed_content(
             model=settings["EMBEDDING_MODEL_NAME"],
             contents=question,
         )
-        question_embedding = response.embeddings[0].values
+        query_embedding = embedding_result.embeddings[0].values
 
         search_results = self.collection.query(
-            query_embeddings=[question_embedding],
+            query_embeddings=[query_embedding],
             n_results=min(top_k, settings["TOP_K_RESULTS"]),
         )
 
         docs = search_results.get("documents", [[]])[0]
-        metadata = search_results.get("metadatas", [[]])[0]
+        metadatas = search_results.get("metadatas", [[]])[0]
 
-        context_parts = []
-        source_list = []
-        for doc, meta in zip(docs, metadata):
-            context_parts.append(doc)
-            source_info = {"content": doc, "metadata": meta}
-            source_list.append(source_info)
+        if not docs:
+            return {
+                "answer": "Информация не найдена в документах.",
+                "sources": [],
+            }
 
-        context = "\n\n".join(context_parts)
+        context = "\n\n".join(docs)
+        sources = [
+            {"content": doc, "metadata": meta}
+            for doc, meta in zip(docs, metadatas)
+        ]
 
-        if not context.strip():
-            answer = "Информация не найдена в документах."
-            return {"answer": answer, "sources": []}
-
-        prompt = f"""Используй только этот контекст и ответь на вопрос.
-Если в контексте нет ответа, напиши: "Информация не найдена в документах".
+        prompt = f"""Используй только этот контекст для ответа.
+Если в контексте нет ответа, напиши ровно: "Информация не найдена в документах".
 
 Контекст:
 {context}
@@ -134,7 +141,7 @@ class RAGEngine:
 
 Ответ:"""
 
-        llm_response = self.genai_client.models.generate_content(
+        llm_response = self.client.models.generate_content(
             model=settings["GENERATION_MODEL_NAME"],
             contents=prompt,
         )
@@ -142,5 +149,5 @@ class RAGEngine:
 
         return {
             "answer": answer,
-            "sources": source_list,
+            "sources": sources,
         }

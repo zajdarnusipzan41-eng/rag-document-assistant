@@ -27,7 +27,7 @@ export async function uploadDocument(file: File): Promise<UploadResponse> {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || 'Ошибка при загрузке файла');
   }
 
@@ -40,11 +40,11 @@ export async function sendQuery(query: string, topK: number = 3): Promise<QueryR
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query, top_k: topK }),
+    body: JSON.stringify({ question: query, top_k: topK }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || 'Ошибка при получении ответа');
   }
 

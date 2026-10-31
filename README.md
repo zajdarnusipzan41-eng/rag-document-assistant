@@ -1,48 +1,58 @@
-# 📄 RAG Document Assistant
+# RAG Document Assistant
 
-**RAG Document Assistant** — это full-stack веб-приложение для умного поиска и ответов на вопросы по локальным документам (PDF, TXT, MD) с использованием технологий Retrieval-Augmented Generation (RAG).
+Это простой RAG-проект для поиска по документам.
 
-Приложение принимает пользовательские файлы, разбивает их на чанки, сохраняет эмбеддинги в векторную базу данных ChromaDB и генерирует точные ответы с помощью OpenAI API, подтягивая только актуальный контекст.
+## Что умеет
+- загрузка PDF/TXT/MD файлов
+- разбиение текста на чанки
+- эмбеддинги через Gemini
+- поиск по векторной базе ChromaDB
+- генерация ответа на вопрос по найденным чанкам
 
----
-
-## 🛠 Технологический стек
-
-### **Backend**
-* **Python 3.10+** & **FastAPI** — быстрый асинхронный REST API framework.
-* **ChromaDB** — локальная векторная база данных для семантического поиска.
-* **OpenAI API (`gpt-4o-mini`, `text-embedding-3-small`)** — векторизация текста и генерация ответов.
-* **Pydantic v2** — строгая валидация данных и схем API.
-* **PyPDF** — извлечение текста из PDF-документов.
-
-### **Frontend**
-* **React** & **TypeScript** — динамичный и типизированный пользовательский интерфейс.
-* **Fetch API / Form Data** — асинхронное взаимодействие с FastAPI бэкендом.
-
----
-
-## 🏗 Архитектура проекта
-
+## Структура проекта
 ```text
-RAG Document Assistant/
+project/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # Точка входа FastAPI, CORS, подсоединение роутеров
-│   │   ├── config.py        # Настройки Pydantic Settings и считывание .env
-│   │   ├── schemas.py       # Pydantic-модели запросов и ответов
-│   │   ├── ingestion.py     # Модуль чтения и чанкинга файлов (PDF/TXT)
-│   │   ├── rag_engine.py    # Работа с ChromaDB и обращение к OpenAI API
-│   │   └── routers/
-│   │       ├── chat.py      # Маршрут POST /api/v1/chat/query
-│   │       └── documents.py # Маршрут POST /api/v1/documents/upload
+│   │   ├── config.py
+│   │   ├── main.py
+│   │   └── rag_engine.py
 │   ├── .env.example
-│   ├── .gitignore
 │   └── requirements.txt
-│
-└── frontend/
-    └── src/
-        ├── api.ts           # Клиентский слой для запросов к FastAPI
-        ├── App.tsx          # Главный макет приложения
-        └── components/
-            ├── FileUpload.tsx # Компонент загрузки и векторизации файлов
-            └── Chat.tsx       # Интерфейс чата с выводом источников
+├── src/
+│   ├── App.tsx
+│   ├── api.ts
+│   ├── Chat.tsx
+│   └── components/
+├── README.md
+└── package.json
+```
+
+## Запуск backend
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# затем укажи реальный GEMINI_API_KEY
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Запуск frontend
+```bash
+npm install
+npm run dev
+```
+
+## API
+- POST /api/v1/upload
+- POST /api/v1/query
+
+## Пример запроса
+```json
+{
+  "question": "Что написано в документе?",
+  "top_k": 4
+}
+```
