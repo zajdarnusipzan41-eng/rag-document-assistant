@@ -1,39 +1,50 @@
 # RAG Document Assistant
 
-Это простой RAG-проект для поиска по документам.
+Это учебный проект для поиска информации в документах с помощью RAG (Retrieval-Augmented Generation).
 
-## Что умеет
-- загрузка PDF/TXT/MD файлов
-- разбиение текста на чанки
-- эмбеддинги через Gemini
-- поиск по векторной базе ChromaDB
-- генерация ответа на вопрос по найденным чанкам
+Проект умеет:
+- загружать PDF, TXT и MD файлы;
+- разбивать текст на небольшие фрагменты (chunks);
+- создавать эмбеддинги через Gemini;
+- искать похожие куски текста в ChromaDB;
+- отвечать на вопросы по найденным фрагментам.
 
-## Запуск backend
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# вставь свой GEMINI_API_KEY
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+Что такое RAG?
+RAG — это способ, при котором модель сначала ищет нужную информацию в документах,
+а потом использует её для генерации ответа.
 
-## Запуск frontend
-```bash
-npm install
-npm run dev
-```
+---
 
-## API
-- POST /api/v1/upload
-- POST /api/v1/query
+## Основная идея проекта
 
-## Пример JSON
-```json
-{
-  "question": "Что написано в документе?",
-  "top_k": 4
-}
-```
+Пользователь загружает документ в приложение.  
+Программа:
+1. читает файл;
+2. разбивает текст на чанки;
+3. превращает чанки в векторные представления;
+4. сохраняет их в ChromaDB;
+5. при вопросе ищет наиболее похожие фрагменты;
+6. отправляет их в Gemini для ответа.
+
+---
+
+## Структура проекта
+
+```text
+rag-document-assistant/
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── rag_engine.py
+│   │   └── config.py
+│   ├── .env
+│   ├── .env.example
+│   ├── requirements.txt
+│   └── ...
+├── src/
+├── package.json
+├── index.html
+├── tsconfig.json
+├── vite.config.ts
+├── README.md
+└── ...
